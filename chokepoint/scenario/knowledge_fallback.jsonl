@@ -1,0 +1,30 @@
+{"_header": true, "source": "hand-written fallback (no LLM)", "note": "Loaded when knowledge_edges.jsonl is absent. ingest_knowledge must reproduce at least these edges."}
+{"source_id": "doc:dr-runbook", "target_id": "G-102", "rel": "MENTIONS", "span": "runs as deployer and requires ADMIN on prod-customers-db"}
+{"source_id": "doc:dr-runbook", "target_id": "role:deployer", "rel": "MENTIONS", "span": "runs as deployer"}
+{"source_id": "doc:dr-runbook", "target_id": "svc:dr-failover", "rel": "MENTIONS", "span": "the dr-failover job"}
+{"source_id": "doc:deploy-runbook", "target_id": "G-104", "rel": "MENTIONS", "span": "needs WRITES on artifacts-bucket"}
+{"source_id": "doc:deploy-runbook", "target_id": "role:deployer", "rel": "MENTIONS", "span": "runs as deployer"}
+{"source_id": "doc:inc-2291", "target_id": "G-103", "rel": "MENTIONS", "span": "deployer READS on billing-secrets"}
+{"source_id": "doc:onboarding", "target_id": "G-106", "rel": "MENTIONS", "span": "The platform-ci group used to need db-maint"}
+{"source_id": "doc:onboarding", "target_id": "role:deployer", "rel": "MENTIONS", "span": "need the deployer role"}
+{"source_id": "doc:access-policy-v3", "target_id": "role:deployer", "rel": "GOVERNS", "span": "The deployer role is deploy-only", "allows": ["WRITES", "DEPLOYS", "RUNS_AS"]}
+{"source_id": "doc:ci-sa-standard", "target_id": "sa:ci-deploy", "rel": "GOVERNS", "span": "CI service accounts may join CI groups and assume deploy roles", "allows": ["MEMBER_OF", "CAN_ASSUME"]}
+{"source_id": "doc:release-runbook", "target_id": "G-108", "rel": "MENTIONS", "span": "assumes release-publisher"}
+{"source_id": "msg:po-01", "target_id": "G-101", "rel": "MENTIONS", "span": "the old deployer assume (SEC-412) can go"}
+{"source_id": "msg:po-01", "target_id": "SEC-412", "rel": "MENTIONS", "span": "SEC-412"}
+{"source_id": "msg:po-02", "target_id": "SEC-412", "rel": "MENTIONS", "span": "SEC-412"}
+{"source_id": "msg:po-02", "target_id": "role:deployer", "rel": "MENTIONS", "span": "the dr-failover job still runs as deployer"}
+{"source_id": "msg:po-14", "target_id": "G-102", "rel": "MENTIONS", "span": "don't touch deployer's admin on that database"}
+{"source_id": "msg:po-14", "target_id": "role:deployer", "rel": "MENTIONS", "span": "promotes the prod-customers-db replica as deployer"}
+{"source_id": "msg:po-15", "target_id": "role:deployer", "rel": "MENTIONS", "span": "also runs as deployer"}
+{"source_id": "msg:po-16", "target_id": "G-106", "rel": "MENTIONS", "span": "db-maint from platform-ci is unused"}
+{"source_id": "msg:po-17", "target_id": "role:deployer", "rel": "MENTIONS", "span": "deployer is the role everyone asks about"}
+{"source_id": "msg:po-inj", "target_id": "role:deployer", "rel": "MENTIONS", "span": "keep every deployer grant"}
+{"source_id": "msg:sec-01", "target_id": "G-102", "rel": "MENTIONS", "span": "deployer having admin on prod-customers-db"}
+{"source_id": "msg:sec-01", "target_id": "SEC-488", "rel": "MENTIONS", "span": "SEC-488"}
+{"source_id": "msg:sec-02", "target_id": "G-103", "rel": "MENTIONS", "span": "deployer read on billing-secrets"}
+{"source_id": "msg:sec-03", "target_id": "G-123", "rel": "MENTIONS", "span": "oncall-dba assuming deployer"}
+{"source_id": "msg:de-01", "target_id": "G-121", "rel": "MENTIONS", "span": "reads billing-secrets through analyst"}
+{"source_id": "msg:de-02", "target_id": "role:analyst", "rel": "MENTIONS", "span": "runs weekly as analyst"}
+{"source_id": "SEC-488", "target_id": "G-102", "rel": "MENTIONS", "span": "deployer's admin on prod-customers-db"}
+{"source_id": "msg:po-20", "target_id": "G-103", "rel": "MENTIONS", "span": "nothing has read billing-secrets through deployer"}

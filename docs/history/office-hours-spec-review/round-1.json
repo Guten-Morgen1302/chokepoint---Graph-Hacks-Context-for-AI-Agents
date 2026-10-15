@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "round": 1,
+  "document": "C:\\Users\\harsh\\.gstack\\projects\\GraphHacksContextforAIAgents\\harsh-unknown-design-20261002-165244.md",
+  "quality_score": 5,
+  "dimensions": {
+    "completeness": "ISSUES",
+    "consistency": "ISSUES",
+    "clarity": "ISSUES",
+    "scope": "ISSUES",
+    "feasibility": "ISSUES"
+  },
+  "findings": [
+    {
+      "id": "R1-1",
+      "dimension": "consistency",
+      "problem": "The min-cut method is stated three incompatible ways. 'What Makes This Cool' says algo.maxFlow itself returns the fewest bumps. Hero query 2 says to read back saturated direct-dependency edges as the cut, with Python only as a fallback. Open Question #1 (RESOLVED) says maxFlow returns only positive-flow edges and the cut is always computed in Python. Saturated edges are also not a min cut in general; they can be a strict superset.",
+      "remedy": "Make the residual-graph computation in Python over FalkorDB's edgeFlows the single primary method in Hero query 2 and the 'What Makes This Cool' bullet. Remove the 'saturated edges form the cut' wording and state in the README that FalkorDB computes the flow and Python derives the cut."
+    },
+    {
+      "id": "R1-2",
+      "dimension": "consistency",
+      "problem": "Stale status. The Cross-Model synthesis still calls maxFlow's return shape unverified and labels it 'open question #1', which is now marked RESOLVED. The Assignment still asks the builder to spend time confirming what algo.maxFlow returns, which the docs read already answered. Only the Docker check in Next Step 1 remains.",
+      "remedy": "Update the synthesis paragraph and The Assignment to match the resolved state: what remains is the scratch-instance check of edgeFlows behaviour and picking the incident."
+    },
+    {
+      "id": "R1-3",
+      "dimension": "feasibility",
+      "problem": "The residual-graph procedure in Open Question #1 BFSes only over leftover forward capacity. A correct min-cut source set has to include reverse residual edges, where positive flow on u->v gives v->u capacity. Without them the reachable set can be too small and the returned cut can be larger than the max flow, so it is not minimal. That breaks the hero claim.",
+      "remedy": "Specify that the residual graph includes reverse arcs for every edge with positive flow, that the BFS starts from all sources (the implicit super-source), and that the cut capacity is asserted to equal maxFlow as a runtime check."
+    },
+    {
+      "id": "R1-4",
+      "dimension": "feasibility",
+      "problem": "The cut unit is undefined, and node-splitting on shared PackageVersion nodes gives wrong plans. PackageVersion nodes are shared across services (key name@version), but upgrading a direct dependency happens per service lockfile. If one split node stands for 'bump P everywhere', that bump is not a single action. A node that is direct in service A but transitive in service B would also get cap 1, which lets the cut 'bump' a transitive package in B. If instead the unit is (service, direct dep), the cross-service cut breaks down into independent per-service cuts, and 'across every service at once' adds nothing.",
+      "remedy": "Define what one counted bump is: either a distinct package/version bumped org-wide, or a per-service edit. Build the flow graph so that only that unit is cuttable: split per Service->direct edge or per package with service-scoped in-nodes, and transitive occurrences stay uncuttable. Define the 'bump every direct parent' baseline in the same unit."
+    },
+    {
+      "id": "R1-5",
+      "dimension": "feasibility",
+      "problem": "Nothing establishes that bumping a direct parent actually removes the vulnerable version, because semver range solving is explicitly skipped. Being an 'upgradable direct package with a fixed release available' requires knowing that some newer version of the parent resolves to a non-vulnerable transitive tree. OSV FIXED_IN covers only the vulnerable package, not its parents.",
+      "remedy": "Specify how a parent's 'fixed release' is determined, for example registry metadata for the parent's newer versions checked against the vulnerable range, or a precomputed hand-verified table for the demo incident. Record that data in the graph so the cut only uses parents with a verified fixing release."
+    },
+    {
+      "id": "R1-6",
+      "dimension": "completeness",
+      "problem": "The success criterion 'correct: re-running the exposure query after a simulated upgrade returns 0 paths' is circular. If a simulated upgrade means deleting the cut edges or nodes, zero paths follows by construction and proves nothing about real-world correctness, which Premise 6 names as the main credibility risk.",
+      "remedy": "Define an independent oracle for the success criterion, such as applying the planned bumps in a scratch checkout, running npm install, then npm ls or osv-scanner on the result, or a hand-verified expected cut for the demo incident."
+    },
+    {
+      "id": "R1-7",
+      "dimension": "completeness",
+      "problem": "There is no behaviour for when no feasible cut exists. A path where no direct parent has a fixing release gets cap 10^6 everywhere, so maxFlow is at least 10^6. The agent's output in that case (unfixable service, overrides-only, accept/defer) is not defined.",
+      "remedy": "Specify detection (maxFlow >= the large-cap threshold) and the user-visible result: list the uncuttable services and paths, and offer overrides or a decision record instead of a plan."
+    },
+    {
+      "id": "R1-8",
+      "dimension": "completeness",
+      "problem": "The case where the vulnerable package is itself a direct dependency of a service is not handled in the flow model. Is the Service->vulnerable PackageVersion edge cuttable, and does it count as a bump?",
+      "remedy": "State that a direct dependency on the vulnerable package is a cuttable unit, bumped to the OSV fixed version, and how it is counted in the plan and the baseline."
+    },
+    {
+      "id": "R1-9",
+      "dimension": "clarity",
+      "problem": "The default overrides framing (Open Question 6) is deferred to /plan-ceo-review, yet the document already commits to 'The hero result is a min-cut' over direct dependencies with fixed releases. The text says 'Otherwise the agent presents overrides as option 1', but it never says which behaviour ships by default. Labeling it open does not resolve the conflict with the committed hero claim.",
+      "remedy": "Choose and document the default output: whether overrides are shown first, shown as an alternative, or excluded by a stated org policy, and how the demo narrates why the cut is constrained to direct dependencies."
+    },
+    {
+      "id": "R1-10",
+      "dimension": "feasibility",
+      "problem": "One incident candidate cannot work. In the Sept 2025 debug/chalk compromise, the malicious versions were live for only hours. Lockfiles pinned to commits from just before the incident cannot contain those versions, so exposure would be zero. MAL- entries also typically have no fixed version, so the fixed-release cut does not apply.",
+      "remedy": "Drop the debug/chalk candidate, or redefine its replay (for example, lockfiles regenerated during the compromise window) and specify what 'fix' means for malicious packages."
+    },
+    {
+      "id": "R1-11",
+      "dimension": "feasibility",
+      "problem": "The data section supports only package-lock v2/v3, but the 2021-2022 candidate incidents (minimist, json5, semver) mean commits from that era. Many of those repos still had v1 lockfiles or used yarn.lock, which narrows the pool of usable repos without saying so.",
+      "remedy": "Add 'lockfileVersion >= 2 at the pinned commit' as an explicit repo-selection criterion in Next Step 2, or scope v1 parsing in."
+    },
+    {
+      "id": "R1-12",
+      "dimension": "feasibility",
+      "problem": "The loader's complexity is hidden. package-lock v2/v3 lists packages by node_modules path, not as name@version edges. Building DEPENDS_ON edges requires running Node's nested node_modules resolution for every dependency entry and deciding how to treat peer, optional and bundled dependencies. All of that is scheduled into Day 1 without being called out.",
+      "remedy": "Specify the edge-resolution rule (walk up node_modules ancestors) and the treatment of peer, optional and bundled dependencies in the loader contract, and size Day 1 accordingly."
+    },
+    {
+      "id": "R1-13",
+      "dimension": "clarity",
+      "problem": "It is undefined whether dev-scope dependencies count as exposure. The model stores scope 'prod'|'dev', but the exposure, notify and cut queries do not filter on it, so dev-only paths would inflate the exposure counts and the cut.",
+      "remedy": "Decide whether exposure and the cut cover prod only or both, and reflect that in the hero queries and the evidence block."
+    },
+    {
+      "id": "R1-14",
+      "dimension": "consistency",
+      "problem": "Path depth bounds are inconsistent and could miss paths. The exposure query caps paths at DEPENDS_ON*1..12, while the notify query is unbounded (DEPENDS_ON*). A depth cap risks the 'misses a transitive path' failure that Premise 6 calls credibility-ending.",
+      "remedy": "Choose one depth policy, justified from the actual maximum depth in the chosen lockfiles, and apply it to every traversal query."
+    },
+    {
+      "id": "R1-15",
+      "dimension": "feasibility",
+      "problem": "Enumerating every path is likely to explode. Returning every path p for a package with 'huge transitive reach' such as minimist can produce a combinatorial number of paths across 5 services. That threatens the 30-second success criterion and the rendering of the UI path graph.",
+      "remedy": "Specify that the cut and the counts use reachable-subgraph or node-set extraction rather than full path enumeration, and that displayed paths are capped (for example, the shortest path per service/direct parent) with an explicit total count."
+    },
+    {
+      "id": "R1-16",
+      "dimension": "feasibility",
+      "problem": "Hero query 6 misstates what betweenness computes. algo.betweenness ranks nodes by all-pairs shortest paths across the whole dependency subgraph, not by how many service->vulnerable paths pass through them, so it will not answer 'packages most service paths pass through'.",
+      "remedy": "Either restate what betweenness measures, or compute chokepoints as a per-node count of service->sink paths or reachability, and explain the choice in the README query list."
+    },
+    {
+      "id": "R1-17",
+      "dimension": "consistency",
+      "problem": "The tool count is inconsistent. Premise 5 and Approach A say about 6 typed tools, but the Agent section lists 7 (find_exposure, plan_min_cut, blast_radius, who_to_notify, record_decision, recall_decisions, draft_issue). No tool exposes hero query 6 (chokepoint betweenness).",
+      "remedy": "Reconcile the tool list and count, and either add a chokepoint tool or state that query 6 is reached only through the read-only FalkorDB MCP server."
+    },
+    {
+      "id": "R1-18",
+      "dimension": "clarity",
+      "problem": "Decision revalidation semantics are undefined. The design says 'diff the two' but does not define when a decision 'still holds' versus is invalidated: the assumed path disappears, new paths to the same vuln appear, the version changes, or the service gets a new direct parent.",
+      "remedy": "Define the revalidation outcomes (holds / stale / superseded) and the rule for each, including the case of new unreviewed paths, and what the agent tells the user in each case."
+    },
+    {
+      "id": "R1-19",
+      "dimension": "feasibility",
+      "problem": "The VIA_PATH model cannot reconstruct a path. (:Decision)-[:VIA_PATH {path_hash}]->(:PackageVersion) stores an unordered set of nodes, so the order of the original path, and which hop was direct, is lost. That makes exact path diffs impossible when nodes are shared.",
+      "remedy": "Store the ordered path, for example a position property on each VIA_PATH edge or an ordered key list on the Decision, and define how path_hash is computed."
+    },
+    {
+      "id": "R1-20",
+      "dimension": "clarity",
+      "problem": "Evidence for the cut is not specified. Success Criteria say every claim links to a Cypher query and its path, but the cut is derived in Python from maxFlow output, and answers from @falkordb/mcpserver are not covered by the evidence block definition.",
+      "remedy": "Define the evidence block for plan_min_cut (the maxFlow call, the flow subgraph, the residual cut steps) and for ad-hoc mcpserver queries."
+    },
+    {
+      "id": "R1-21",
+      "dimension": "completeness",
+      "problem": "The read-only status of @falkordb/mcpserver is asserted but never enforced. The server can run arbitrary Cypher, so an LLM-generated write or delete could corrupt the decision memory or the demo graph.",
+      "remedy": "Specify the enforcement mechanism: GRAPH.RO_QUERY only, a read-only FalkorDB/ACL user, or limiting the exposed mcpserver tools."
+    },
+    {
+      "id": "R1-22",
+      "dimension": "completeness",
+      "problem": "The public live deployment has no auth ('auth' is explicitly skipped) but exposes an LLM agent backed by a paid API key. Nothing prevents cost abuse or runaway token spend during judging.",
+      "remedy": "Specify rate limiting, a per-session or global spend cap, or a key-protected demo mode for the live URL."
+    },
+    {
+      "id": "R1-23",
+      "dimension": "completeness",
+      "problem": "Public visitors can write to the shared demo graph through record_decision, and scratch graphs flow_<run_id> are created per run. There is no isolation, reset or cleanup, so visitors can pollute the session-2 recall demo and scratch graphs accumulate on FalkorDB Cloud.",
+      "remedy": "Specify per-visitor or resettable decision state for the live demo, and deletion of flow_<run_id> graphs after each run (plus a sweep for any that are left behind)."
+    },
+    {
+      "id": "R1-24",
+      "dimension": "clarity",
+      "problem": "The 'It's <incident date>' replay leaks future knowledge. OSV data and registry releases fetched today include fixed versions and parent releases published after the incident date. The cut could recommend releases that did not exist on the replay date, and nothing says whether that is acceptable.",
+      "remedy": "Decide whether fixed and parent releases are filtered to those published on or before the replay date, or disclose in the demo that the plan uses present-day releases."
+    },
+    {
+      "id": "R1-25",
+      "dimension": "clarity",
+      "problem": "The Problem Statement claims existing tools cannot 'remember why a past finding was accepted', which is unsupported and arguably false. Snyk ignore policies carry a reason and an expiry, and Dependabot alert dismissals record a reason. Judges may know this.",
+      "remedy": "Narrow the claim to what is actually different: cross-service recall that is revalidated against the current dependency path."
+    },
+    {
+      "id": "R1-26",
+      "dimension": "consistency",
+      "problem": "'The wedge ships end-to-end on day 1' (Constraints) contradicts the schedule. Day 1 covers only the loader, the exposure query and the CLI. The wedge as defined in Approach A (min-cut, MCP tools, decision memory, UI) lands on Days 2-3.",
+      "remedy": "Redefine the Day-1 milestone as the exposure-only slice, or reword the Constraints line so it matches the schedule."
+    },
+    {
+      "id": "R1-27",
+      "dimension": "clarity",
+      "problem": "The 'What I noticed' bullet saying this doc 'marks every auto-decision, so you can overturn any of them in one line' is not borne out. Only the Premises and Approach A are marked as auto-accepted. Other auto-made choices (multigraph tenancy, the 7-tool list, drafting rather than posting, the overrides policy lean, the model choice) are not flagged.",
+      "remedy": "Either mark every auto-decision explicitly (for example, an 'Auto-decisions' list) or soften the claim."
+    },
+    {
+      "id": "R1-28",
+      "dimension": "feasibility",
+      "problem": "Next Step 2 says to check exposure paths 'by hand' across 5 lockfiles for a package with huge transitive reach before Oct 15, but gives no method. Doing it manually is impractical, and it is the only correctness baseline the demo has.",
+      "remedy": "Name the independent tool for the pre-Oct-15 check (for example, npm ls <pkg> --all in each pinned checkout, or osv-scanner) and record its output in the notes folder as the expected answer."
+    },
+    {
+      "id": "R1-29",
+      "dimension": "scope",
+      "problem": "An org_live tenant for 'current lockfiles' is introduced without any feature, demo beat or success criterion that uses it, while the cross-model advice says to skip live ingestion.",
+      "remedy": "Remove org_live from v0, or state the specific demo or criterion it serves."
+    }
+  ],
+  "prior": []
+}

@@ -1,0 +1,23 @@
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports: ["127.0.0.1:6379:6379", "127.0.0.1:3000:3000"]   # local only; 3000 = FalkorDB Browser
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+  app:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      CHOKEPOINT_SECRET: ${CHOKEPOINT_SECRET:-change-me}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CHOKEPOINT_ADMIN_TOKEN: ${CHOKEPOINT_ADMIN_TOKEN:-}
+    depends_on:
+      falkordb:
+        condition: service_healthy

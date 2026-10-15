@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chokepoint · Northwind Labs</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js" defer></script>
+<script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js" defer></script>
+<script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js" defer></script>
+<script>window.BOOT = __BOOT__;</script>
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <span class="brand">Chokepoint</span>
+  <span class="tenant">Northwind Labs · synthetic data · <span id="graph-mode">private copy</span></span>
+  <span class="spacer"></span>
+  <span class="chip" id="memory-chip" title="Decisions stored in this graph">Memory: 0 decisions</span>
+  <button class="link" id="new-session">New session</button>
+  <button class="link" id="reset">Reset demo</button>
+</header>
+<div class="banner" id="banner" hidden></div>
+
+<main>
+  <section class="finding" aria-label="Finding">
+    <div class="finding-line">
+      <span class="fid" id="finding-id">F-1</span>
+      <span id="finding-title">Loading findings…</span>
+      <span class="meta" id="finding-meta"></span>
+      <span class="spacer"></span>
+      <button class="primary" id="triage">Triage F-1</button>
+    </div>
+    <div class="ask-line">
+      <div class="chips" id="finding-chips"></div>
+      <label class="sr-only" for="ask">Ask anything about Northwind's access</label>
+      <input id="ask" placeholder="e.g. why does ci-deploy have deployer?" autocomplete="off">
+      <button id="ask-btn">Ask</button>
+    </div>
+  </section>
+
+  <section class="answer" aria-label="Answer" aria-live="polite" id="answer">
+    <div class="hero muted" id="hero">Pick a finding and press Triage.</div>
+    <div class="proof" id="proof"></div>
+    <div class="why" id="why"></div>
+    <div class="metrics" id="metrics"></div>
+  </section>
+
+  <div class="work">
+    <section class="graph-wrap" aria-label="Attack graph">
+      <div class="graph-head"><h2>Attack graph</h2><button class="link" id="as-list">View as list</button></div>
+      <div id="graph" role="img" aria-label="Attack paths from the finding to crown jewels"></div>
+      <ol id="route-list" class="route-list" hidden></ol>
+    </section>
+    <aside class="rail">
+      <section aria-label="Agent review">
+        <h2>Agent review</h2>
+        <ol id="trail" class="trail" role="log" aria-live="polite"><li class="muted">Not run yet.</li></ol>
+        <div id="narrative" class="narrative" hidden></div>
+      </section>
+      <section aria-label="Revocation plan">
+        <h2>Revocation plan</h2>
+        <ul id="plan" class="plan"><li class="muted">—</li></ul>
+        <div id="tickets"></div>
+      </section>
+      <section aria-label="Decisions">
+        <h2>Decisions</h2>
+        <ul id="decisions" class="decisions"><li class="muted">No decisions yet. Accept a risk on any grant to remember it.</li></ul>
+      </section>
+      <section aria-label="Simulate change">
+        <h2>Simulate change</h2>
+        <div class="events">
+          <button data-event="grant-hr-payroll">Grant deployer READS hr-payroll-db</button>
+          <button data-event="decommission-dr-grant">Remove deployer ADMIN on prod-customers-db</button>
+          <button data-event="new-message">New #platform-ops message</button>
+        </div>
+        <div class="toast" id="toast" role="status"></div>
+      </section>
+    </aside>
+  </div>
+
+  <details class="evidence" id="evidence">
+    <summary>Evidence <span id="evidence-summary" class="meta">no queries yet</span></summary>
+    <ol id="evidence-list"></ol>
+  </details>
+</main>
+
+<aside class="drawer" id="drawer" hidden aria-labelledby="drawer-title">
+  <div class="drawer-head"><h2 id="drawer-title" tabindex="-1">Provenance</h2><button class="link" id="drawer-close">Close</button></div>
+  <div id="drawer-body"></div>
+</aside>
+</body>
+</html>

@@ -1,0 +1,104 @@
+# Northwind Labs: the hand-designed scenario overlay (synthetic data, rule 6).
+#
+# Every name, person and ticket here is fictional.
+# generate.py adds templated noise around this core.
+#
+# Grant cost is derived from usage, never typed by hand:
+#   cost = 1 + ceil(log2(1 + uses_30d))
+#
+#   F-1 attack graph (ATTACK edges; grants are nodes):
+#
+#   F-1 ─entry─▶ ci-deploy-token ─auth_as─▶ ci-deploy
+#                                           │ G-101 CAN_ASSUME (uses 3, cost 3)    ─▶ deployer
+#                                           │ G-105 MEMBER_OF  (uses 40, cost 7)   ─▶ platform-ci
+#                                           │ G-108 CAN_ASSUME (uses 140, cost 9)  ─▶ release-publisher ─G-109─▶ artifacts-bucket
+#   deployer ─G-102 ADMIN_TO (uses 0, cost 1)─▶ prod-customers-db   ★ jewel  (the DR grant: only the runbook knows)
+#   deployer ─G-103 READS    (uses 0, cost 1)─▶ billing-secrets     ★ jewel
+#   deployer ─G-104 WRITES   (uses 61, cost 7)─▶ artifacts-bucket
+#   platform-ci ─G-106 CAN_ASSUME (uses 2, cost 3)─▶ db-maint ─G-107 READS (uses 12, cost 5)─▶ prod-customers-db
+#
+#   routes = 2 independent routes (via G-101, and via G-105/G-106/G-107)
+#   P0 (cheapest) = {G-102, G-103, G-106}, cost 5   (routes 2 <= |P0| 3: Menger, strictly less)
+#   P1 (keep G-102, the DR grant) = {G-101, G-106}, cost 6
+#   keyword baseline (keeps G-102, G-103 and G-106) = {G-101, G-107}, cost 8  (wrong)
+
+teams:
+  - {id: team:platform, name: Platform}
+  - {id: team:security, name: Security}
+  - {id: team:data, name: Data}
+  - {id: team:finance, name: Finance}
+  - {id: team:people-ops, name: People Ops}
+
+people:
+  - {id: person:a.rao, name: Asha Rao, team: team:platform}
+  - {id: person:b.kim, name: Ben Kim, team: team:security}
+  - {id: person:c.osei, name: Chidi Osei, team: team:platform}
+  - {id: person:d.mehta, name: Dev Mehta, team: team:data}
+  - {id: person:alice, name: Alice Moreau, team: team:data}
+  - {id: person:e.lund, name: Erik Lund, team: team:finance}
+  - {id: person:f.ngata, name: Fiona Ngata, team: team:people-ops}
+
+nodes:
+  - {id: sa:ci-deploy, label: ServiceAccount, name: ci-deploy, owner: team:platform}
+  - {id: sa:dr-failover, label: ServiceAccount, name: dr-failover, owner: team:platform}
+  - {id: sa:artifact-sweeper, label: ServiceAccount, name: artifact-sweeper, owner: team:platform}
+  - {id: role:deployer, label: Role, name: deployer, owner: team:platform}
+  - {id: role:release-publisher, label: Role, name: release-publisher, owner: team:platform}
+  - {id: role:db-maint, label: Role, name: db-maint, owner: team:data}
+  - {id: role:analyst, label: Role, name: analyst, owner: team:data}
+  - {id: group:platform-ci, label: Group, name: platform-ci, owner: team:platform}
+  - {id: group:oncall-dba, label: Group, name: oncall-dba, owner: team:data}
+  - {id: secret:ci-deploy-token, label: Secret, name: ci-deploy-token, owner: team:platform}
+  - {id: host:alice-laptop, label: Host, name: alice-laptop, owner: team:data}
+  - {id: db:prod-customers-db, label: Database, name: prod-customers-db, owner: team:data, crown_jewel: true}
+  - {id: secret:billing-secrets, label: Secret, name: billing-secrets, owner: team:finance, crown_jewel: true}
+  - {id: db:hr-payroll-db, label: Database, name: hr-payroll-db, owner: team:people-ops, crown_jewel: true}
+  - {id: bucket:artifacts-bucket, label: Bucket, name: artifacts-bucket, owner: team:platform}
+
+# structural (non-revocable) movement
+structural:
+  - {src: secret:ci-deploy-token, dst: sa:ci-deploy, kind: auth_as}
+  - {src: host:alice-laptop, dst: person:alice, kind: session}
+
+grants:
+  # id, holder, kind, target, uses_30d, last_used, owner team, granted_by, ticket
+  - {id: G-101, holder: sa:ci-deploy, kind: CAN_ASSUME, target: role:deployer, uses_30d: 3, last_used: "2026-09-29", owner: team:platform, granted_by: person:a.rao, ticket: SEC-412}
+  - {id: G-102, holder: role:deployer, kind: ADMIN_TO, target: db:prod-customers-db, uses_30d: 0, last_used: "2026-07-24", owner: team:data, granted_by: person:c.osei, ticket: SEC-388}
+  - {id: G-103, holder: role:deployer, kind: READS, target: secret:billing-secrets, uses_30d: 0, last_used: "2025-11-02", owner: team:finance, granted_by: person:c.osei, ticket: SEC-301}
+  - {id: G-104, holder: role:deployer, kind: WRITES, target: bucket:artifacts-bucket, uses_30d: 61, last_used: "2026-10-01", owner: team:platform, granted_by: person:a.rao, ticket: SEC-330}
+  - {id: G-105, holder: sa:ci-deploy, kind: MEMBER_OF, target: group:platform-ci, uses_30d: 40, last_used: "2026-10-01", owner: team:platform, granted_by: person:a.rao, ticket: SEC-290}
+  - {id: G-106, holder: group:platform-ci, kind: CAN_ASSUME, target: role:db-maint, uses_30d: 2, last_used: "2026-09-14", owner: team:data, granted_by: person:d.mehta, ticket: SEC-305}
+  - {id: G-107, holder: role:db-maint, kind: READS, target: db:prod-customers-db, uses_30d: 12, last_used: "2026-09-30", owner: team:data, granted_by: person:d.mehta, ticket: SEC-306}
+  - {id: G-108, holder: sa:ci-deploy, kind: CAN_ASSUME, target: role:release-publisher, uses_30d: 140, last_used: "2026-10-02", owner: team:platform, granted_by: person:a.rao, ticket: SEC-420}
+  - {id: G-109, holder: role:release-publisher, kind: WRITES, target: bucket:artifacts-bucket, uses_30d: 140, last_used: "2026-10-02", owner: team:platform, granted_by: person:a.rao, ticket: SEC-421}
+  - {id: G-110, holder: sa:dr-failover, kind: CAN_ASSUME, target: role:deployer, uses_30d: 0, last_used: "2026-07-24", owner: team:platform, granted_by: person:c.osei, ticket: SEC-389}
+  - {id: G-111, holder: sa:artifact-sweeper, kind: CAN_ASSUME, target: role:deployer, uses_30d: 30, last_used: "2026-10-01", owner: team:platform, granted_by: person:a.rao, ticket: SEC-331}
+  # F-2 (alice's laptop)
+  - {id: G-120, holder: person:alice, kind: CAN_ASSUME, target: role:analyst, uses_30d: 1, last_used: "2026-09-20", owner: team:data, granted_by: person:d.mehta, ticket: SEC-500}
+  - {id: G-121, holder: role:analyst, kind: READS, target: secret:billing-secrets, uses_30d: 1, last_used: "2026-09-20", owner: team:finance, granted_by: person:e.lund, ticket: SEC-501}
+  - {id: G-122, holder: person:alice, kind: MEMBER_OF, target: group:oncall-dba, uses_30d: 12, last_used: "2026-09-30", owner: team:data, granted_by: person:d.mehta, ticket: SEC-502}
+  - {id: G-123, holder: group:oncall-dba, kind: CAN_ASSUME, target: role:deployer, uses_30d: 4, last_used: "2026-09-26", owner: team:platform, granted_by: person:c.osei, ticket: SEC-503}
+
+services:
+  - {id: svc:release-pipeline, name: release-pipeline, criticality: 3, depends_on: [G-108, G-109]}
+  - {id: svc:artifact-sweeper, name: artifact-sweeper, criticality: 1, depends_on: [G-111, G-104]}
+  # The dependency register is incomplete on purpose: dr-failover has NO DEPENDS_ON_GRANT edges.
+  # Its dependency on G-102 exists only in the DR Failover Runbook (the agent has to read it).
+  - {id: svc:dr-failover, name: dr-failover, criticality: 3, depends_on: []}
+
+findings:
+  - {id: F-1, title: "ci-deploy token leaked in a public build log", severity: critical, at: "2026-10-02T09:14:00Z", entry: [secret:ci-deploy-token]}
+  - {id: F-2, title: "alice's laptop compromised (EDR alert)", severity: high, at: "2026-10-03T11:02:00Z", entry: [host:alice-laptop]}
+
+# Whitelisted scenario events (ENG2-7: three events)
+events:
+  grant-hr-payroll:
+    title: "Platform grants deployer READS on hr-payroll-db"
+    add_grant: {id: G-130, holder: role:deployer, kind: READS, target: db:hr-payroll-db, uses_30d: 0, last_used: null, owner: team:people-ops, granted_by: person:c.osei, ticket: SEC-530}
+  decommission-dr-grant:
+    title: "Data team removes deployer ADMIN on prod-customers-db"
+    remove_grant: G-102
+  new-message:
+    title: "New message in #platform-ops"
+    add_message: {id: msg:po-20, thread: thread:platform-ops, author: person:e.lund, at: "2026-10-03T15:00:00Z",
+                  text: "Finance confirms: nothing has read billing-secrets through deployer since the vault migration. Safe to drop that grant."}

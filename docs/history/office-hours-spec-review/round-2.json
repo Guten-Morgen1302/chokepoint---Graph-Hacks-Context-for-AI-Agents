@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "round": 2,
+  "document": "C:\\Users\\harsh\\.gstack\\projects\\GraphHacksContextforAIAgents\\harsh-unknown-design-20261002-165244.md",
+  "quality_score": 6,
+  "dimensions": {
+    "completeness": "ISSUES",
+    "consistency": "ISSUES",
+    "clarity": "ISSUES",
+    "scope": "PASS",
+    "feasibility": "ISSUES"
+  },
+  "findings": [
+    {
+      "id": "R2-1",
+      "dimension": "feasibility",
+      "problem": "Within a single service, PackageVersion nodes are keyed by name@version. A v2/v3 lockfile can install the same name@version at several node_modules paths, and each copy can resolve its children to different versions through the Node walk-up the loader contract itself specifies. Merging those copies into one node unions their child edges. That creates paths that do not exist in the real tree (for example A -> X@1 -> Y@2 -> vuln when only B's copy of X resolves Y@2). The svcs filter stops leaks between services but not leaks between copies inside one service. The result inflates exposure, direct-parent sets and path counts, can distort the cut, and will disagree with the npm ls oracle.",
+      "remedy": "Either key the flow and exposure graph per install path (node_modules path) within a service and map cut nodes back to name@version for display, or have the loader detect copies of the same name@version whose resolved children differ and fail or flag that service. Document the choice."
+    },
+    {
+      "id": "R2-2",
+      "dimension": "feasibility",
+      "problem": "Transitive DEPENDS_ON edges are shared across services (svcs:[...]) but carry a single scope and a single optional value. The same edge X@1 -> Y@1 can be prod in one service and dev in another, so the 'prod scope only by default' filter returns wrong results for at least one service. The loader also derives scope from the child entry's dev flag, which is a per-lockfile fact, not a per-edge one.",
+      "remedy": "Make scope (and optional) per service, for example prod_svcs and dev_svcs lists on each edge, or separate edges per service, and filter on $svc IN r.prod_svcs in the traversal policy."
+    },
+    {
+      "id": "R2-3",
+      "dimension": "feasibility",
+      "problem": "The depth cap ($maxDepth = max(Service.max_depth) + 2) comes from a BFS, which measures shortest distance from the service. The longest simple path, and the hop count from a particular direct parent to the vulnerable version, can be much longer than the deepest BFS distance. The cap can therefore drop real paths and nodes, which is the 'misses a transitive path' failure Premise 6 calls credibility-ending.",
+      "remedy": "Measure the longest path length per service at load time (DAG dynamic programming, with a cycle fallback), or extract the reachable node set without a hop bound (forward reachability from the service intersected with backward reachability from the vulnerable version). Justify the cap from that measurement."
+    },
+    {
+      "id": "R2-4",
+      "dimension": "feasibility",
+      "problem": "Hero query 1 says 'each hop is filtered with $svc IN r.svcs and on scope' and also that there is no full path enumeration. In Cypher, a per-hop predicate on a list property over a variable-length pattern normally needs a path variable with all(r IN relationships(p) WHERE ...), which enumerates paths, the explosion the traversal policy rules out. The document never says how per-service node-set extraction is actually executed in FalkorDB.",
+      "remedy": "Specify the mechanism and confirm it in the pre-Oct-15 scratch Docker check. Options: per-service edge types or properties that FalkorDB can filter inline, a per-service projected subgraph, or iterative frontier BFS (one hop per query) driven from Python."
+    },
+    {
+      "id": "R2-5",
+      "dimension": "feasibility",
+      "problem": "Hero query 1 writes the hop bound as a parameter (DEPENDS_ON*0..$maxDepth). Cypher engines generally do not accept parameters in variable-length bounds, and FalkorDB support for this is not established, so the README query as written may not run.",
+      "remedy": "Confirm FalkorDB's behavior in the scratch instance. If parameters are unsupported, state that the bound is interpolated into the query string as a validated integer, and show that form in the README."
+    },
+    {
+      "id": "R2-6",
+      "dimension": "feasibility",
+      "problem": "The correctness oracle requires our path counts to match npm ls <pkg> --all. npm ls prints a tree of install locations and marks repeated subtrees as 'deduped' without expanding them. Its output is not a count of distinct dependency paths, so the comparison as specified is undefined or will fail even when the graph is correct.",
+      "remedy": "Define exactly what is compared against npm ls, for example the set of exposed services, the set of direct parents and the set of vulnerable install locations parsed from npm ls --json. Either validate path counts another way or drop path counts from the oracle."
+    },
+    {
+      "id": "R2-7",
+      "dimension": "consistency",
+      "problem": "The structural plan is pitched at 'orgs that ban aliases and overrides', yet most chokepoints will be transitive packages (the example node-gyp@8, jsdom@16). A transitive package can only be changed by an override (banned for that audience) or by bumping its ancestors until a release whose range excludes it. The 1-hop check only looks at the chokepoint's own latest release and explicitly skips semver ranges, so a 'clean at 1 hop' result does not tell that audience any action they are allowed to take.",
+      "remedy": "State what action a transitive chokepoint implies for an org that bans overrides (for example, the direct parent to bump and whether its newer release drops the chokepoint version), or reframe the chokepoints as an exposure-structure insight rather than a remediation plan, and keep the demo narration consistent with that."
+    },
+    {
+      "id": "R2-8",
+      "dimension": "consistency",
+      "problem": "The Synthesis argues the cut 'only means something when ... the vulnerable package has no trivial fix', and that is the stated reason for choosing a no-fix incident. The lead incident does have a one-line fix: alias request to @cypress/request. It is shown first as option 1 (auto-decision 6, Open Question 5). By the document's own reasoning, the hero chokepoints become secondary in the lead demo, and the only remaining motivation, an alias or override ban, is an assumption with no evidence behind it.",
+      "remedy": "Reconcile the rationale with the incident choice. Either pick an incident with no drop-in alias, or state explicitly that the chokepoints matter because of an alias/override-ban policy and narrate that policy in the demo. Revise the Synthesis sentence either way."
+    },
+    {
+      "id": "R2-9",
+      "dimension": "clarity",
+      "problem": "The Problem Statement (Q2: 'Which packages does every exposed path in a service pass through') and the example output ('all of them go through 2 packages: node-gyp@8 and jsdom@16') describe dominators: packages that are on every path. A minimum vertex cut is a set where every path passes through at least one member. These are different results, and judges who know graphs will spot it.",
+      "remedy": "Reword Q2 and the example as 'every exposed path passes through at least one of these packages', or compute and present dominators separately if that is the intended claim."
+    },
+    {
+      "id": "R2-10",
+      "dimension": "clarity",
+      "problem": "Minimum vertex cuts are often not unique. The residual BFS from the source returns one particular minimum cut, the one closest to the source. Hero query 3's org summary ('node-gyp appears in the cut for 3 of 4 exposed services') depends on that tie-breaking, so it can understate packages that appear in equally valid alternative cuts. The document does not say which cut is returned.",
+      "remedy": "State that the reported cut is the source-closest minimum cut, label the org summary accordingly, and optionally report when an alternative minimum cut exists (for example by also computing the sink-closest cut)."
+    },
+    {
+      "id": "R2-11",
+      "dimension": "clarity",
+      "problem": "Persisting from R1-18. NEEDS_REVIEW fires when 'new paths appeared', but a Decision stores a single ordered path_keys, and the design forbids full path enumeration. Nothing records which paths or direct parents existed and were reviewed when the decision was made. Any service with more than one exposed path would therefore always count as having 'new' paths, so the rule cannot be evaluated.",
+      "remedy": "Store a reviewed baseline on the Decision, for example the set of (direct parent, vulnerable version) pairs or the node-set hash at decision time. Define 'new' as baseline elements that are now present but were absent then, computed with the same node-set extraction."
+    },
+    {
+      "id": "R2-12",
+      "dimension": "consistency",
+      "problem": "The flagship recall example accepts svc-docs exposure 'because it's dev-only' and later reports HOLDS. Re-validation re-runs query 1, which is prod-only by default under the traversal policy. A dev-only decided path would not be found, so the rule as written yields STALE, contradicting the example.",
+      "remedy": "Specify that re-validation runs query 1 in the scope recorded on the Decision (store scope on the Decision), or with include_dev on, and update the HOLDS rule to match."
+    },
+    {
+      "id": "R2-13",
+      "dimension": "completeness",
+      "problem": "HOLDS only checks that path_keys still exist and that there are no new prod paths. It does not re-check the premise behind the decision. If the accepted dev-only path became prod (the same name@version keys, but the scope changed), the decision would still report HOLDS, even though its rationale ('dev-only') is now false.",
+      "remedy": "Record the scope (and any other fact the decision relies on) on the Decision. Have re-validation return STALE or NEEDS_REVIEW when that fact has changed, with a message naming the change."
+    },
+    {
+      "id": "R2-14",
+      "dimension": "clarity",
+      "problem": "The four re-validation states are not mutually exclusive. A decision can be superseded and also have its path gone, or its path can be gone while new paths appear. No precedence is defined, so the badge shown in the UI and checked by the success criterion is ambiguous.",
+      "remedy": "Define a precedence order (for example SUPERSEDED > STALE > NEEDS_REVIEW > HOLDS) or allow multiple badges, and state which one the success criterion checks."
+    },
+    {
+      "id": "R2-15",
+      "dimension": "consistency",
+      "problem": "Canned demo questions are 'served from cached transcripts'. Those answers would keep working with FalkorDB removed, contradicting the success criterion 'Removing FalkorDB breaks every feature' (rule 3). They would also ignore the visitor's own v_<visitorId> graph, for example a visitor's recorded decision would not appear in a cached recall answer, contradicting 'coming only from the graph'.",
+      "remedy": "Cache only the LLM narration while re-executing every tool query live against the visitor's graph, or label cached answers on screen as recorded replays, exclude them from the rule-3 claim, and never use them for recall or decision questions."
+    },
+    {
+      "id": "R2-16",
+      "dimension": "clarity",
+      "problem": "The 'under 30 seconds for canned prompts' success criterion is met trivially if canned prompts are served from cached transcripts, so it does not measure the system.",
+      "remedy": "State that the latency criteria are measured on uncached end-to-end runs (agent plus live queries) against the replay tenant."
+    },
+    {
+      "id": "R2-17",
+      "dimension": "completeness",
+      "problem": "@falkordb/mcpserver connects as a single read-only ACL user and the LLM chooses which graph to query. Nothing stops an ad-hoc question from reading another visitor's v_<visitorId> graph, so decisions can leak between sessions. That contradicts 'Their decisions never leak into anyone else's session.'",
+      "remedy": "Scope ad-hoc access to the current visitor's graph: per-request key-pattern ACLs, a proxy that pins the graph name, or exposing only tmpl_replay to mcpserver. State which one is used."
+    },
+    {
+      "id": "R2-18",
+      "dimension": "feasibility",
+      "problem": "Read-only enforcement depends on an ACL user that can run only GRAPH.RO_QUERY. If @falkordb/mcpserver issues GRAPH.QUERY (or other commands such as GRAPH.LIST) for reads, every ad-hoc query will be rejected and the feature breaks. Whether it does is not verified, and it is not in the pre-Oct-15 checks. FalkorDB Cloud ACL support is also unconfirmed.",
+      "remedy": "Add to Next Step 1: confirm which commands mcpserver sends and that a GRAPH.RO_QUERY-only ACL user works on FalkorDB Cloud. Document a fallback, such as a read-only mode in mcpserver or a thin proxy that rewrites to RO_QUERY."
+    },
+    {
+      "id": "R2-19",
+      "dimension": "completeness",
+      "problem": "Each new visitor gets a GRAPH.COPY of the template, but there is no authentication and no cap on how many visitor graphs can be created. A script that rotates visitor IDs can create unlimited copies and exhaust FalkorDB Cloud memory, taking the live demo down during judging.",
+      "remedy": "Cap the number of live visitor graphs and their creation rate (globally and per IP). When the cap is reached, fall back to read-only access on the template or to evicting the oldest graph."
+    },
+    {
+      "id": "R2-20",
+      "dimension": "completeness",
+      "problem": "Visitor graphs 'expire after 24h', but no mechanism is given. The sweep is described only for flow_* graphs, and nothing says whether a Redis key TTL or a sweep enforces the visitor expiry.",
+      "remedy": "Specify the expiry mechanism for v_* graphs (key TTL refreshed on access, or a sweep based on a last-used timestamp) and where that timestamp is stored."
+    },
+    {
+      "id": "R2-21",
+      "dimension": "clarity",
+      "problem": "Hero query 5 (notify) is a placeholder, not a query: 'MATCH (t:Team)-[:OWNS]->(s:Service)<-[:FOR]-... ; (p:Person)-[:MEMBER_OF]->(t)'. The FOR relationship links Decisions, not exposure, and the README must list the Cypher the product depends on.",
+      "remedy": "Write the actual notify query (exposed services from query 1 -> owning Team -> member Persons) with its scope and depth filters."
+    },
+    {
+      "id": "R2-22",
+      "dimension": "clarity",
+      "problem": "The blast_radius tool ('reverse reachability from a package') has no query, no scope or svcs filtering rule, no output definition and no demo role, unlike the other six tools, which map to hero queries.",
+      "remedy": "Define blast_radius's query, its filters and its output, or drop it and adjust the tool count."
+    },
+    {
+      "id": "R2-23",
+      "dimension": "clarity",
+      "problem": "The Success Criteria say expected oracle outputs are 'saved in notes/oracle/ before Oct 15'. The cut oracle, however, applies the product's planned cut, which does not exist before Oct 15 under rule 8, so the cut part cannot have a saved expected answer.",
+      "remedy": "Separate the two: exposure expected answers are saved before Oct 15, and the cut oracle is a CI procedure that runs on the computed cut (or on a hand-derived expected cut, if one is prepared before Oct 15)."
+    },
+    {
+      "id": "R2-24",
+      "dimension": "consistency",
+      "problem": "The Assignment differs from Next Step 2. It omits the lockfileVersion >= 2 check and the osv-scanner output. 'Clone 5 candidate apps ... keep the 5 where at least 3 show exposure' also leaves unclear how many candidates to screen and what happens if the criterion is not met (switch to a fallback incident?).",
+      "remedy": "Align the Assignment with Next Step 2 (lockfile version check, osv-scanner output) and state the candidate pool size and the fallback if fewer than 3 repos qualify."
+    },
+    {
+      "id": "R2-25",
+      "dimension": "completeness",
+      "problem": "The loader contract does not handle workspace or link entries (link:true, packages resolved to a local folder) in v2/v3 lockfiles. These are common in real npm apps, and under the stated rule they would make regular dependencies unresolved and fail the service's load.",
+      "remedy": "Either add 'no workspaces' as a repo-selection criterion or specify how link entries are followed to their target package entry."
+    }
+  ],
+  "prior": [
+    {"id": "R1-1", "status": "resolved", "evidence": "'What Makes This Cool' and hero query 2 now both say algo.maxFlow computes the flow and Python derives the cut from the residual graph with a cut == maxFlow check. Open Question 1 matches, and the 'saturated edges' wording is gone.", "current_id": null},
+    {"id": "R1-2", "status": "resolved", "evidence": "The Synthesis no longer calls maxFlow unverified. The Assignment is now the npm ls answer-key task. Only the Docker check of edgeFlows remains, in Next Step 1.", "current_id": null},
+    {"id": "R1-3", "status": "resolved", "evidence": "Hero query 2 specifies forward arcs where cap - flow > 0, a reverse arc for every edge with positive flow, a BFS from the source, and an assertion that cut capacity == maxFlow surfaced as an error.", "current_id": null},
+    {"id": "R1-4", "status": "resolved", "evidence": "Cuts are now per service on a node-split flow graph built from the svcs-filtered exposure subgraph. Every package node is a cap-1 cuttable unit, the service and the vulnerable node are uncuttable, and the 'bump every direct parent' baseline was dropped (Synthesis). Node-identity problems inside one service are a new defect, R2-1.", "current_id": null},
+    {"id": "R1-5", "status": "resolved", "evidence": "The document no longer claims verified fixing releases. Hero query 4 is an explicitly labelled 1-hop registry check ('not a guarantee'), and the full check moves to the Success Criteria oracle.", "current_id": null},
+    {"id": "R1-6", "status": "resolved", "evidence": "The Success Criteria now define an independent oracle: npm ls on the same lockfile, plus applying the cut as overrides with a stub, re-resolving, and checking with npm ls.", "current_id": null},
+    {"id": "R1-7", "status": "resolved", "evidence": "Hero query 2, 'No feasible cut': maxFlow >= 10^6 reports 'no cut possible', shows the paths, and offers a DROP_IN alias or override, or an accept/defer decision.", "current_id": null},
+    {"id": "R1-8", "status": "resolved", "evidence": "Hero query 2 models a direct dependency on the vulnerable package as a cost-1 DirectUse split node.", "current_id": null},
+    {"id": "R1-9", "status": "resolved", "evidence": "Auto-decision 6 and Open Question 5 commit the default: option 1 (alias or override) is shown first, then the chokepoints. The consistency of that choice with the Synthesis rationale is new finding R2-8.", "current_id": null},
+    {"id": "R1-10", "status": "resolved", "evidence": "Open Question 2 drops debug/chalk Sept 2025 and gives the reasons (versions live only for hours, no fix semantics for MAL- entries).", "current_id": null},
+    {"id": "R1-11", "status": "resolved", "evidence": "lockfileVersion >= 2 is a selection criterion in the Loader contract, in Data and in Next Step 2.", "current_id": null},
+    {"id": "R1-12", "status": "resolved", "evidence": "The Loader contract specifies Node walk-up resolution over the packages map, the handling of optional, peer and bundled dependencies, an unresolved-dependency policy, and a dedicated Day 1 slice.", "current_id": null},
+    {"id": "R1-13", "status": "resolved", "evidence": "The Traversal policy sets prod scope by default with an include_dev toggle, and every evidence block shows the scope used. Per-service scope on shared edges is a new defect, R2-2.", "current_id": null},
+    {"id": "R1-14", "status": "persisting", "evidence": "One depth policy is now applied everywhere, but it is justified from a BFS max_depth (shortest distance), not the actual maximum path depth in the lockfiles, so the cap can still miss paths.", "current_id": "R2-3"},
+    {"id": "R1-15", "status": "resolved", "evidence": "The Traversal policy specifies reachable node-set extraction, DAG dynamic-programming path counts with a cycle fallback, and displayed paths capped to the shortest per (service, direct parent) with a total count. Whether the per-hop filter can be executed without enumeration is new finding R2-4.", "current_id": null},
+    {"id": "R1-16", "status": "resolved", "evidence": "Betweenness is now a stretch 'structural hubs' panel, described accurately and explicitly not claimed as a chokepoint.", "current_id": null},
+    {"id": "R1-17", "status": "resolved", "evidence": "Premise 5, Approach A and the Agent section all say 7 tools. The chokepoint function is find_chokepoints (queries 2-4), and betweenness is a stretch goal outside the tool list.", "current_id": null},
+    {"id": "R1-18", "status": "persisting", "evidence": "HOLDS/STALE/NEEDS_REVIEW/SUPERSEDED are now defined, but NEEDS_REVIEW depends on 'new paths' with no stored baseline of reviewed paths (the Decision keeps a single path_keys), so the rule for new unreviewed paths still cannot be evaluated.", "current_id": "R2-11"},
+    {"id": "R1-19", "status": "resolved", "evidence": "Decision now stores ordered path_keys, and path_hash = sha1('|'.join(path_keys)) is defined.", "current_id": null},
+    {"id": "R1-20", "status": "resolved", "evidence": "The Evidence block defines cypher/params/rows_summary/ms per tool. find_chokepoints adds the maxFlow call, flow-graph size, cut edges, the assertion and the registry checks. Ad-hoc mcpserver answers are logged with their raw Cypher and labelled.", "current_id": null},
+    {"id": "R1-21", "status": "resolved", "evidence": "The mechanism is specified: mcpserver connects as a FalkorDB ACL user limited to GRAPH.RO_QUERY. Verifying that this works is new finding R2-18, and cross-tenant reads are new finding R2-17.", "current_id": null},
+    {"id": "R1-22", "status": "resolved", "evidence": "Live-demo safety specifies limits of 10 per visitor per hour and 300 per day globally, a 'demo budget reached' message, and a 12-tool-call cap per answer.", "current_id": null},
+    {"id": "R1-23", "status": "resolved", "evidence": "Per-visitor v_<visitorId> graphs isolate record_decision writes, the template is read-only, and flow_* graphs are dropped in finally with a 15-minute sweep. The visitor-graph expiry mechanism and creation cap are new findings R2-20 and R2-19.", "current_id": null},
+    {"id": "R1-24", "status": "resolved", "evidence": "Replay dating: OSV data and registry checks are current, disclosed on screen ('analysis uses today's advisory data'), and as-of filtering is a stretch goal.", "current_id": null},
+    {"id": "R1-25", "status": "resolved", "evidence": "The Problem Statement now acknowledges that existing tools record ignore and dismissal reasons, and narrows the claim to cross-service convergence and decisions re-checked against the current path.", "current_id": null},
+    {"id": "R1-26", "status": "resolved", "evidence": "Constraints now define the day-1 milestone as the exposure-only slice and the full wedge by the end of day 3, matching Build days.", "current_id": null},
+    {"id": "R1-27", "status": "resolved", "evidence": "An explicit 'Auto-decisions made under the user's standing authorization' list (15 items) now covers tenancy, the tool list, drafting only, the overrides order, the model and more.", "current_id": null},
+    {"id": "R1-28", "status": "resolved", "evidence": "Next Step 2 and the Assignment name npm ls request --all --package-lock-only --omit=dev (plus osv-scanner in Next Step 2), saved to notes/oracle/.", "current_id": null},
+    {"id": "R1-29", "status": "resolved", "evidence": "The org_live tenant is gone. Tenants are now tmpl_replay, v_<visitorId> and flow_<runId>, each with a stated purpose.", "current_id": null}
+  ]
+}

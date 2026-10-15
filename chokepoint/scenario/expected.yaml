@@ -1,0 +1,49 @@
+# Hand-derived answers for the Northwind scenario. TEST-ONLY: the product never reads this file.
+#
+# Numbers come from the grant costs in northwind.yaml:
+#   cost = 1 + ceil(log2(1 + uses_30d))
+#   G-101=3 G-102=1 G-103=1 G-104=7 G-105=7 G-106=3 G-107=5 G-108=9
+#   G-120=2 G-121=2 G-122=5 G-123=4
+
+F-1:
+  jewels: [db:prod-customers-db, secret:billing-secrets]
+  routes: 2                       # SD-1: unit maxFlow into the virtual super-sink
+  shortest_grants: 2              # ci-deploy -G-101-> deployer -G-102-> prod-customers-db
+  naive_cost: 19                  # G-101 + G-105 + G-108 (everything ci-deploy holds)
+  P0: {grants: [G-102, G-103, G-106], cost: 5, unique: true}
+  menger_strict: true             # routes (2) < |P0| (3): the bound is an inequality
+  P1_keep: [G-102]                # the agent keeps the DR grant (cites doc:dr-runbook)
+  P1: {grants: [G-101, G-106], cost: 6, services_broken: []}
+  keyword_baseline:               # SD-3: regex keeps every P0 grant near "deployer" + a dependency verb
+    keep: [G-102, G-103, G-106]
+    plan: {grants: [G-101, G-107], cost: 8}
+  dr_grant: {id: G-102, uses_30d: 0, depends_on_grant_from_dr_failover: false}
+
+F-2:
+  routes: 2
+  shortest_grants: 2              # alice -G-120-> analyst -G-121-> billing-secrets
+  before_accept: {grants_src: [G-102, G-103, G-120], grants_sink: [G-102, G-103, G-121], cost: 4, unique: false}
+  after_accept_G-102: {grants_src: [G-120, G-123], grants_sink: [G-121, G-123], cost: 6, unique: false, default: src}
+
+events:
+  grant-hr-payroll: {decision_on: G-102, badge: NEEDS_REVIEW, reasons: [new_jewels], new_jewels: [db:hr-payroll-db]}
+  decommission-dr-grant: {decision_on: G-102, badge: STALE, reasons: [grant_removed]}
+
+policy:
+  G-102: violation          # Access Policy v3 §4 governs deployer: ADMIN_TO not allowed
+  G-104: ok                 # WRITES allowed
+  G-101: ok                 # CI Service Account Standard allows CAN_ASSUME
+  G-106: none               # no doc governs platform-ci
+
+must_mention:               # the agent's key evidence must exist as graph edges
+  - [doc:dr-runbook, G-102]
+  - [doc:inc-2291, G-103]
+  - [doc:onboarding, G-106]
+
+distractors:                # mention deployer with dependency-sounding verbs, but do NOT block a P0 revocation
+  doc:deploy-runbook: "about G-104 (artifacts-bucket), not in any plan"
+  doc:inc-2291: "supports revoking G-103 (nothing uses it)"
+  doc:onboarding: "who gets the deployer role; says nobody requires G-106"
+
+who_knows:
+  role:deployer: {top: person:b.kim}      # 4 sources: sec-01, sec-02, sec-03, SEC-488

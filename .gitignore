@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.gstack/
+
+# demo video build (raw recording, renders and cut clips stay out of git)
+video/node_modules/
+video/out/
+video/raw/
+video/public/clips/

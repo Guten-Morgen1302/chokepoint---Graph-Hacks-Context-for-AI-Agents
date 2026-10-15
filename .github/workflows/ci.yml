@@ -1,0 +1,19 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      falkordb:
+        image: falkordb/falkordb:latest
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-dev.txt
+      - name: tests (real FalkorDB, stub LLM)
+        env: { FALKORDB_PORT: "6379" }
+        run: pytest -q
+      - name: README query section is up to date
+        run: python scripts/readme_queries.py --check
